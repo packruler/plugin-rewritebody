@@ -174,13 +174,14 @@ func getBytesFromGzip(buffer bytes.Buffer) ([]byte, bool) {
 }
 
 func getBytesFromBrotli(buffer bytes.Buffer) (bodyBytes []byte, ok bool) {
-	brotliReader := brotli.NewReader(&buffer)
+	bytesReader := bytes.NewReader(buffer.Bytes())
 	// if err != nil {
 	// 	log.Printf("Failed to load body reader: %v", err)
 
 	// 	return buffer.Bytes()
 	// }
 
+	brotliReader := brotli.NewReader(bytesReader)
 	bodyBytes, err := ioutil.ReadAll(brotliReader)
 	if err != nil {
 		log.Printf("Failed to read body: %s", err)
@@ -236,13 +237,13 @@ func compressWithBrotli(bodyBytes []byte) []byte {
 	brotliWriter := brotli.NewWriter(&buf)
 
 	if _, err := brotliWriter.Write(bodyBytes); err != nil {
-		log.Printf("unable to recompress rewrited body: %v", err)
+		log.Printf("unable to recompress rewriten body: %v", err)
 
 		return bodyBytes
 	}
 
 	if err := brotliWriter.Close(); err != nil {
-		log.Printf("unable to close gzip writer: %v", err)
+		log.Printf("unable to close brotli writer: %v", err)
 
 		return bodyBytes
 	}
