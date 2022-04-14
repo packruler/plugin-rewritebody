@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -180,7 +181,7 @@ func getBytesFromBrotli(buffer bytes.Buffer) (bodyBytes []byte, ok bool) {
 	// 	return buffer.Bytes()
 	// }
 
-	bodyBytes, err := io.ReadAll(brotliReader)
+	bodyBytes, err := ioutil.ReadAll(brotliReader)
 	if err != nil {
 		log.Printf("Failed to read body: %s", err)
 
