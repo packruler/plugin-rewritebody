@@ -98,6 +98,34 @@ func TestServeHTTP(t *testing.T) {
 			expResBody:      "bar is the new bar",
 			expLastModified: true,
 		},
+		{
+			desc: "should support gzip encoding",
+			rewrites: []Rewrite{
+				{
+					Regex:       "foo",
+					Replacement: "bar",
+				},
+			},
+			contentEncoding: "gzip",
+			lastModified:    true,
+			resBody:         string(compressWithGzip([]byte("foo is the new bar"))),
+			expResBody:      string(compressWithGzip([]byte("bar is the new bar"))),
+			expLastModified: true,
+		},
+		{
+			desc: "should support brotli encoding",
+			rewrites: []Rewrite{
+				{
+					Regex:       "foo",
+					Replacement: "bar",
+				},
+			},
+			contentEncoding: "br",
+			lastModified:    true,
+			resBody:         string(compressWithBrotli([]byte("foo is the new bar"))),
+			expResBody:      string(compressWithBrotli([]byte("bar is the new bar"))),
+			expLastModified: true,
+		},
 	}
 
 	for _, test := range tests {

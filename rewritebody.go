@@ -182,6 +182,7 @@ func getBytesFromBrotli(buffer bytes.Buffer) (bodyBytes []byte, ok bool) {
 	// }
 
 	brotliReader := brotli.NewReader(bytesReader)
+
 	bodyBytes, err := ioutil.ReadAll(brotliReader)
 	if err != nil {
 		log.Printf("Failed to read body: %s", err)
