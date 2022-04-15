@@ -113,6 +113,20 @@ func TestServeHTTP(t *testing.T) {
 			expLastModified: true,
 		},
 		{
+			desc: "should support deflate encoding",
+			rewrites: []Rewrite{
+				{
+					Regex:       "foo",
+					Replacement: "bar",
+				},
+			},
+			contentEncoding: "deflate",
+			lastModified:    true,
+			resBody:         string(compressWithZlib([]byte("foo is the new bar"))),
+			expResBody:      string(compressWithZlib([]byte("bar is the new bar"))),
+			expLastModified: true,
+		},
+		{
 			desc: "should support brotli encoding",
 			rewrites: []Rewrite{
 				{
@@ -164,7 +178,7 @@ func TestServeHTTP(t *testing.T) {
 			}
 
 			if !bytes.Equal([]byte(test.expResBody), recorder.Body.Bytes()) {
-				t.Errorf("got body %q, want %q", recorder.Body.Bytes(), test.expResBody)
+				t.Errorf("got body: %s\n wanted: %s", recorder.Body.Bytes(), []byte(test.expResBody))
 			}
 		})
 	}

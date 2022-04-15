@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"compress/zlib"
 	"context"
 	"fmt"
 	"io"
@@ -101,8 +102,9 @@ func (bodyRewrite *rewriteBody) ServeHTTP(response http.ResponseWriter, req *htt
 			bodyBytes = rwt.regex.ReplaceAll(bodyBytes, rwt.replacement)
 		}
 
-		log.Printf("Body Bytes: %s", bodyBytes)
 		bodyBytes = prepareBodyBytes(bodyBytes, encoding)
+	} else {
+		bodyBytes = wrappedWriter.buffer.Bytes()
 	}
 
 	if _, err := response.Write(bodyBytes); err != nil {
@@ -125,6 +127,8 @@ func (wrappedWriter *responseWriter) getHeaderContent() (encoding string, conten
 		fallthrough
 	case "br":
 		fallthrough
+	case "deflate":
+		fallthrough
 	case "identity":
 		fallthrough
 	case "":
@@ -142,9 +146,38 @@ func (wrappedWriter *responseWriter) decompressBody(encoding string) ([]byte, bo
 	case "br":
 		return getBytesFromBrotli(wrappedWriter.buffer)
 
+	case "deflate":
+		return getBytesFromZlib(wrappedWriter.buffer)
+
 	default:
 		return wrappedWriter.buffer.Bytes(), true
 	}
+}
+
+func getBytesFromZlib(buffer bytes.Buffer) ([]byte, bool) {
+	zlibReader, err := zlib.NewReader(&buffer)
+	if err != nil {
+		log.Printf("Failed to load body reader: %v", err)
+
+		return buffer.Bytes(), false
+	}
+
+	bodyBytes, err := io.ReadAll(zlibReader)
+	if err != nil {
+		log.Printf("Failed to read body: %s", err)
+
+		return buffer.Bytes(), false
+	}
+
+	err = zlibReader.Close()
+
+	if err != nil {
+		log.Printf("Failed to close reader: %v", err)
+
+		return buffer.Bytes(), false
+	}
+
+	return bodyBytes, true
 }
 
 func getBytesFromGzip(buffer bytes.Buffer) ([]byte, bool) {
@@ -175,11 +208,6 @@ func getBytesFromGzip(buffer bytes.Buffer) ([]byte, bool) {
 
 func getBytesFromBrotli(buffer bytes.Buffer) (bodyBytes []byte, ok bool) {
 	bytesReader := bytes.NewReader(buffer.Bytes())
-	// if err != nil {
-	// 	log.Printf("Failed to load body reader: %v", err)
-
-	// 	return buffer.Bytes()
-	// }
 
 	brotliReader := brotli.NewReader(bytesReader)
 
@@ -189,14 +217,6 @@ func getBytesFromBrotli(buffer bytes.Buffer) (bodyBytes []byte, ok bool) {
 
 		return buffer.Bytes(), false
 	}
-
-	// err = bReader.Close()
-
-	// if err != nil {
-	// 	log.Printf("Failed to close reader: %v", err)
-
-	// 	return buffer.Bytes()
-	// }
 
 	return bodyBytes, true
 }
@@ -208,6 +228,9 @@ func prepareBodyBytes(bodyBytes []byte, encoding string) []byte {
 
 	case "br":
 		return compressWithBrotli(bodyBytes)
+
+	case "deflate":
+		return compressWithZlib(bodyBytes)
 
 	default:
 		return bodyBytes
@@ -233,9 +256,38 @@ func compressWithGzip(bodyBytes []byte) []byte {
 	return buf.Bytes()
 }
 
-func compressWithBrotli(bodyBytes []byte) []byte {
+func compressWithZlib(bodyBytes []byte) []byte {
 	var buf bytes.Buffer
-	brotliWriter := brotli.NewWriter(&buf)
+	zlibWriter := zlib.NewWriter(&buf)
+
+	if _, err := zlibWriter.Write(bodyBytes); err != nil {
+		log.Printf("unable to recompress rewrited body: %v", err)
+
+		return bodyBytes
+	}
+
+	if err := zlibWriter.Close(); err != nil {
+		log.Printf("unable to close zlib writer: %v", err)
+
+		return bodyBytes
+	}
+
+	return buf.Bytes()
+}
+
+const (
+	brotliQuality = 11
+	brotliLGWin   = 0
+)
+
+func compressWithBrotli(bodyBytes []byte) []byte {
+	brotliWriterOptions := brotli.WriterOptions{
+		Quality: brotliQuality,
+		LGWin:   brotliLGWin,
+	}
+	// log.Printf("Compressing: %s", bodyBytes)
+	var buf bytes.Buffer
+	brotliWriter := brotli.NewWriterOptions(&buf, brotliWriterOptions)
 
 	if _, err := brotliWriter.Write(bodyBytes); err != nil {
 		log.Printf("unable to recompress rewriten body: %v", err)
