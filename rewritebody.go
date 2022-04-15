@@ -8,14 +8,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"github.com/andybalholm/brotli"
+	"github.com/google/brotli/go/cbrotli"
 )
 
 // Rewrite holds one rewrite body configuration.
@@ -174,28 +173,34 @@ func getBytesFromGzip(buffer bytes.Buffer) ([]byte, bool) {
 }
 
 func getBytesFromBrotli(buffer bytes.Buffer) (bodyBytes []byte, ok bool) {
-	bytesReader := bytes.NewReader(buffer.Bytes())
-	// if err != nil {
-	// 	log.Printf("Failed to load body reader: %v", err)
-
-	// 	return buffer.Bytes()
-	// }
-
-	brotliReader := brotli.NewReader(bytesReader)
-	bodyBytes, err := ioutil.ReadAll(brotliReader)
+	bodyBytes, err := cbrotli.Decode(buffer.Bytes())
 	if err != nil {
-		log.Printf("Failed to read body: %s", err)
+		log.Printf("Failed to decode body: %v", err)
 
 		return buffer.Bytes(), false
 	}
+	// bytesReader := bytes.NewReader(buffer.Bytes())
+	// // if err != nil {
+	// // 	log.Printf("Failed to load body reader: %v", err)
 
-	// err = bReader.Close()
+	// // 	return buffer.Bytes()
+	// // }
 
+	// brotliReader := cbrotli.NewReader(bytesReader)
+	// bodyBytes, err := ioutil.ReadAll(brotliReader)
 	// if err != nil {
-	// 	log.Printf("Failed to close reader: %v", err)
+	// 	log.Printf("Failed to read body: %s", err)
 
-	// 	return buffer.Bytes()
+	// 	return buffer.Bytes(), false
 	// }
+
+	// // err = bReader.Close()
+
+	// // if err != nil {
+	// // 	log.Printf("Failed to close reader: %v", err)
+
+	// // 	return buffer.Bytes()
+	// // }
 
 	return bodyBytes, true
 }
@@ -233,22 +238,19 @@ func compressWithGzip(bodyBytes []byte) []byte {
 }
 
 func compressWithBrotli(bodyBytes []byte) []byte {
-	var buf bytes.Buffer
-	brotliWriter := brotli.NewWriter(&buf)
+	const quality = 4
 
-	if _, err := brotliWriter.Write(bodyBytes); err != nil {
+	compressed, err := cbrotli.Encode(bodyBytes, cbrotli.WriterOptions{
+		Quality: quality,
+		LGWin:   0,
+	})
+	if err != nil {
 		log.Printf("unable to recompress rewriten body: %v", err)
 
 		return bodyBytes
 	}
 
-	if err := brotliWriter.Close(); err != nil {
-		log.Printf("unable to close brotli writer: %v", err)
-
-		return bodyBytes
-	}
-
-	return buf.Bytes()
+	return compressed
 }
 
 type responseWriter struct {
