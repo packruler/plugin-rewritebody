@@ -1,3 +1,9 @@
+# ⚠️ ALERT ⚠️
+
+## AS OF 2022-04-16 THIS REPO HAS MIGRATED AWAY FROM A FORKED VERSION
+
+Updated repo: https://github.com/packruler/rewrite-body
+
 # Rewrite Body
 
 This is a fork of [Traefik](https://github.com/traefik)'s [plugin-rewritebody](https://github.com/traefik/plugin-rewritebody)
